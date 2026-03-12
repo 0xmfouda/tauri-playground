@@ -74,40 +74,6 @@ function App() {
 
   return (
     <main className="app-shell">
-      <section className="intro-panel">
-        <p className="eyebrow">Tauri todo flow</p>
-        <h1>React captures intent. Rust owns the todo data.</h1>
-        <p className="intro-copy">
-          This version shows the desktop app flow more clearly than the calculator:
-          the frontend loads todos from Rust on startup, then every add, toggle, and
-          delete action travels through <code>invoke()</code> before the UI refreshes.
-        </p>
-
-        <div className="flow-list">
-          <div className="flow-step">
-            <span>1</span>
-            <p>User types or clicks in React</p>
-          </div>
-          <div className="flow-step">
-            <span>2</span>
-            <p>React calls a Tauri command with <code>invoke()</code></p>
-          </div>
-          <div className="flow-step">
-            <span>3</span>
-            <p>Rust updates shared todo state and returns the full list</p>
-          </div>
-          <div className="flow-step">
-            <span>4</span>
-            <p>React stores the returned todos and re-renders the screen</p>
-          </div>
-        </div>
-
-        <div className="bridge-card">
-          <span>Backend status</span>
-          <strong>{status}</strong>
-        </div>
-      </section>
-
       <section className="todo-panel" aria-label="Todo list">
         <header className="todo-header">
           <div>
@@ -142,6 +108,11 @@ function App() {
             Add todo
           </button>
         </form>
+
+        <div className="status-banner">
+          <span>Backend status</span>
+          <strong>{status}</strong>
+        </div>
 
         <div className="todo-list">
           {todos.length === 0 ? (

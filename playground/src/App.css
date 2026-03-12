@@ -25,28 +25,18 @@ body {
 .app-shell {
   min-height: 100vh;
   display: grid;
-  grid-template-columns: minmax(280px, 430px) minmax(320px, 720px);
-  gap: 2rem;
-  align-content: center;
-  justify-content: center;
+  align-items: center;
+  justify-items: center;
   padding: 2rem;
   box-sizing: border-box;
 }
 
-.intro-panel,
 .todo-panel {
   border: 1px solid rgba(255, 255, 255, 0.08);
   box-shadow: 0 26px 90px rgba(0, 0, 0, 0.28);
   backdrop-filter: blur(18px);
 }
 
-.intro-panel {
-  padding: 2rem;
-  border-radius: 32px;
-  background: linear-gradient(180deg, rgba(21, 33, 31, 0.88), rgba(17, 19, 18, 0.94));
-}
-
-.eyebrow,
 .panel-label {
   margin: 0 0 0.8rem;
   font-size: 0.78rem;
@@ -55,84 +45,18 @@ body {
   color: #d0b183;
 }
 
-h1,
 h2 {
   margin: 0;
   line-height: 0.96;
   letter-spacing: -0.05em;
 }
 
-h1 {
-  font-size: clamp(2.1rem, 4.3vw, 4rem);
-}
-
 h2 {
   font-size: clamp(1.8rem, 3vw, 2.4rem);
 }
 
-.intro-copy {
-  margin: 1.25rem 0 1.8rem;
-  color: #ddd5ca;
-  line-height: 1.75;
-}
-
-.intro-copy code,
-.flow-step code {
-  font-family: "IBM Plex Mono", "Fira Code", monospace;
-  color: #ffd29a;
-}
-
-.flow-list {
-  display: grid;
-  gap: 0.85rem;
-  margin-bottom: 1.25rem;
-}
-
-.flow-step {
-  display: grid;
-  grid-template-columns: 42px 1fr;
-  gap: 0.9rem;
-  align-items: center;
-  padding: 0.85rem 1rem;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.flow-step span {
-  display: grid;
-  place-items: center;
-  width: 42px;
-  height: 42px;
-  border-radius: 14px;
-  background: linear-gradient(180deg, #eb9f59, #d25d4d);
-  font-weight: 700;
-}
-
-.flow-step p {
-  margin: 0;
-}
-
-.bridge-card {
-  padding: 1rem 1.1rem;
-  border-radius: 24px;
-  background: rgba(245, 239, 231, 0.06);
-}
-
-.bridge-card span {
-  display: block;
-  margin-bottom: 0.4rem;
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.14em;
-  color: #d6b891;
-}
-
-.bridge-card strong {
-  color: #fff4e4;
-  line-height: 1.55;
-}
-
 .todo-panel {
+  width: min(100%, 760px);
   padding: 1.3rem;
   border-radius: 36px;
   background:
@@ -237,6 +161,27 @@ h2 {
   cursor: not-allowed;
 }
 
+.status-banner {
+  margin-bottom: 1rem;
+  padding: 1rem 1.1rem;
+  border-radius: 20px;
+  background: rgba(245, 239, 231, 0.06);
+}
+
+.status-banner span {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #d6b891;
+}
+
+.status-banner strong {
+  color: #fff4e4;
+  line-height: 1.55;
+}
+
 .todo-list {
   display: grid;
   gap: 0.8rem;
@@ -313,17 +258,15 @@ h2 {
 
 @media (max-width: 960px) {
   .app-shell {
-    grid-template-columns: 1fr;
+    padding: 1.5rem;
   }
 }
 
 @media (max-width: 620px) {
   .app-shell {
-    gap: 1rem;
     padding: 1rem;
   }
 
-  .intro-panel,
   .todo-panel {
     border-radius: 28px;
   }
