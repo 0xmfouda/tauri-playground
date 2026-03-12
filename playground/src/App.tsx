@@ -1,220 +1,187 @@
-import { useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import "./App.css";
 
-type Operator = "+" | "-" | "*" | "/";
-
-const digitRows = [
-  ["7", "8", "9"],
-  ["4", "5", "6"],
-  ["1", "2", "3"],
-];
-
-function formatResult(value: number) {
-  if (!Number.isFinite(value)) {
-    return "Error";
-  }
-
-  const formatted = value.toString();
-  return formatted.length > 12 ? value.toPrecision(8) : formatted;
-}
+type TodoItem = {
+  id: number;
+  text: string;
+  completed: boolean;
+};
 
 function App() {
-  const [display, setDisplay] = useState("0");
-  const [storedValue, setStoredValue] = useState<number | null>(null);
-  const [pendingOperator, setPendingOperator] = useState<Operator | null>(null);
-  const [waitingForOperand, setWaitingForOperand] = useState(false);
-  const [status, setStatus] = useState("Ready");
-  const hasError = display === "Error";
+  const [todos, setTodos] = useState<TodoItem[]>([]);
+  const [draft, setDraft] = useState("");
+  const [status, setStatus] = useState("Loading todos from Rust...");
+  const [isBusy, setIsBusy] = useState(true);
 
-  function resetCalculator(nextStatus = "Cleared") {
-    setDisplay("0");
-    setStoredValue(null);
-    setPendingOperator(null);
-    setWaitingForOperand(false);
-    setStatus(nextStatus);
-  }
-
-  function inputDigit(digit: string) {
-    setStatus("Editing");
-
-    if (waitingForOperand || hasError) {
-      setDisplay(digit);
-      setWaitingForOperand(false);
-      return;
+  useEffect(() => {
+    async function loadTodos() {
+      try {
+        const items = await invoke<TodoItem[]>("list_todos");
+        setTodos(items);
+        setStatus("React loaded the current todo list from Rust");
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : String(error));
+      } finally {
+        setIsBusy(false);
+      }
     }
 
-    setDisplay((currentValue) => (currentValue === "0" ? digit : `${currentValue}${digit}`));
-  }
+    void loadTodos();
+  }, []);
 
-  function inputDecimal() {
-    setStatus("Editing");
-
-    if (waitingForOperand || hasError) {
-      setDisplay("0.");
-      setWaitingForOperand(false);
-      return;
-    }
-
-    setDisplay((currentValue) =>
-      currentValue.includes(".") ? currentValue : `${currentValue}.`,
-    );
-  }
-
-  function toggleSign() {
-    if (hasError) {
-      return;
-    }
-
-    setDisplay((currentValue) =>
-      currentValue === "0" ? currentValue : formatResult(Number(currentValue) * -1),
-    );
-    setStatus("Sign flipped");
-  }
-
-  function toPercent() {
-    if (hasError) {
-      return;
-    }
-
-    setDisplay((currentValue) => formatResult(Number(currentValue) / 100));
-    setStatus("Converted to percent");
-  }
-
-  async function runCalculation(nextOperator?: Operator) {
-    if (!pendingOperator || storedValue === null) {
-      return;
-    }
-
-    const right = Number(display);
+  async function syncTodos(
+    command: "add_todo" | "toggle_todo" | "delete_todo",
+    payload: Record<string, number | string>,
+    nextStatus: string,
+  ) {
+    setIsBusy(true);
 
     try {
-      // The reason the arithmetic was pushed into Rust here was to teach the core Tauri idea: 
-      // the frontend is just a UI layer, and Rust is the native backend you can call through invoke().
-      const result = await invoke<number>("calculate", {
-        left: storedValue,
-        right,
-        operator: pendingOperator,
-      });
-
-      const formatted = formatResult(result);
-      setDisplay(formatted);
-      setStoredValue(nextOperator ? result : null);
-      setPendingOperator(nextOperator ?? null);
-      setWaitingForOperand(Boolean(nextOperator));
-      setStatus(`Rust computed ${storedValue} ${pendingOperator} ${right}`);
+      const items = await invoke<TodoItem[]>(command, payload);
+      setTodos(items);
+      setStatus(nextStatus);
     } catch (error) {
-      resetCalculator("Rust rejected the calculation");
-      setDisplay("Error");
       setStatus(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsBusy(false);
     }
   }
 
-  async function chooseOperator(operator: Operator) {
-    if (hasError) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const text = draft.trim();
+    if (!text) {
+      setStatus("Type a todo before sending it to Rust");
       return;
     }
 
-    const currentValue = Number(display);
-
-    if (storedValue === null) {
-      setStoredValue(currentValue);
-      setPendingOperator(operator);
-      setWaitingForOperand(true);
-      setStatus(`Stored ${currentValue} and waiting for the next value`);
-      return;
-    }
-
-    if (waitingForOperand) {
-      setPendingOperator(operator);
-      setStatus(`Operator changed to ${operator}`);
-      return;
-    }
-
-    await runCalculation(operator);
+    setDraft("");
+    await syncTodos("add_todo", { text }, `Rust stored "${text}" and returned the new list`);
   }
 
-  async function calculateResult() {
-    if (hasError || !pendingOperator || storedValue === null || waitingForOperand) {
-      return;
-    }
-
-    await runCalculation();
+  async function toggleTodo(id: number) {
+    await syncTodos("toggle_todo", { id }, `Rust toggled todo #${id}`);
   }
+
+  async function deleteTodo(id: number) {
+    await syncTodos("delete_todo", { id }, `Rust deleted todo #${id}`);
+  }
+
+  const completedCount = todos.filter((todo) => todo.completed).length;
+  const remainingCount = todos.length - completedCount;
 
   return (
     <main className="app-shell">
       <section className="intro-panel">
-        <p className="eyebrow">Tauri calculator</p>
-        <h1>React renders the interface. Rust computes the answer.</h1>
+        <p className="eyebrow">Tauri todo flow</p>
+        <h1>React captures intent. Rust owns the todo data.</h1>
         <p className="intro-copy">
-          Enter numbers in the React UI, then press an operator or equals. When a
-          calculation is needed, the app calls Tauri&apos;s <code>invoke()</code> bridge
-          and Rust returns the result.
+          This version shows the desktop app flow more clearly than the calculator:
+          the frontend loads todos from Rust on startup, then every add, toggle, and
+          delete action travels through <code>invoke()</code> before the UI refreshes.
         </p>
+
+        <div className="flow-list">
+          <div className="flow-step">
+            <span>1</span>
+            <p>User types or clicks in React</p>
+          </div>
+          <div className="flow-step">
+            <span>2</span>
+            <p>React calls a Tauri command with <code>invoke()</code></p>
+          </div>
+          <div className="flow-step">
+            <span>3</span>
+            <p>Rust updates shared todo state and returns the full list</p>
+          </div>
+          <div className="flow-step">
+            <span>4</span>
+            <p>React stores the returned todos and re-renders the screen</p>
+          </div>
+        </div>
+
         <div className="bridge-card">
-          <span>Frontend</span>
-          <strong>
-            {storedValue !== null && pendingOperator
-              ? `${storedValue} ${pendingOperator} ${display}`
-              : display}
-          </strong>
           <span>Backend status</span>
           <strong>{status}</strong>
         </div>
       </section>
 
-      <section className="calculator" aria-label="Calculator">
-        <div className="display-panel">
-          <p className="display-label">Current value</p>
-          <output className="display">{display}</output>
-        </div>
+      <section className="todo-panel" aria-label="Todo list">
+        <header className="todo-header">
+          <div>
+            <p className="panel-label">Live state</p>
+            <h2>Today&apos;s tasks</h2>
+          </div>
+          <div className="stats">
+            <div>
+              <span>Total</span>
+              <strong>{todos.length}</strong>
+            </div>
+            <div>
+              <span>Remaining</span>
+              <strong>{remainingCount}</strong>
+            </div>
+            <div>
+              <span>Done</span>
+              <strong>{completedCount}</strong>
+            </div>
+          </div>
+        </header>
 
-        <div className="keypad">
-          <button className="key utility" type="button" onClick={() => resetCalculator()}>
-            AC
+        <form className="composer" onSubmit={handleSubmit}>
+          <input
+            type="text"
+            value={draft}
+            onChange={(event) => setDraft(event.currentTarget.value)}
+            placeholder="Add a task and press Enter..."
+            disabled={isBusy}
+          />
+          <button type="submit" disabled={isBusy}>
+            Add todo
           </button>
-          <button className="key utility" type="button" onClick={toggleSign}>
-            +/-
-          </button>
-          <button className="key utility" type="button" onClick={toPercent}>
-            %
-          </button>
-          <button className="key operator" type="button" onClick={() => chooseOperator("/")}>
-            /
-          </button>
+        </form>
 
-          {digitRows.map((row) =>
-            row.map((digit) => (
-              <button
-                key={digit}
-                className="key digit"
-                type="button"
-                onClick={() => inputDigit(digit)}
-              >
-                {digit}
-              </button>
-            )),
+        <div className="todo-list">
+          {todos.length === 0 ? (
+            <div className="empty-state">
+              <p>No todos yet.</p>
+              <span>Create one above and React will send it to Rust.</span>
+            </div>
+          ) : (
+            todos.map((todo) => (
+              <article className={`todo-card ${todo.completed ? "done" : ""}`} key={todo.id}>
+                <button
+                  className="toggle-button"
+                  type="button"
+                  onClick={() => toggleTodo(todo.id)}
+                  disabled={isBusy}
+                  aria-label={todo.completed ? "Mark as incomplete" : "Mark as complete"}
+                >
+                  {todo.completed ? "Done" : "Open"}
+                </button>
+
+                <div className="todo-copy">
+                  <strong>{todo.text}</strong>
+                  <span>
+                    {todo.completed
+                      ? "Completed in Rust state"
+                      : "Waiting in Rust state"}
+                  </span>
+                </div>
+
+                <button
+                  className="delete-button"
+                  type="button"
+                  onClick={() => deleteTodo(todo.id)}
+                  disabled={isBusy}
+                >
+                  Delete
+                </button>
+              </article>
+            ))
           )}
-
-          <button className="key operator" type="button" onClick={() => chooseOperator("*")}>
-            *
-          </button>
-          <button className="key operator" type="button" onClick={() => chooseOperator("-")}>
-            -
-          </button>
-          <button className="key zero" type="button" onClick={() => inputDigit("0")}>
-            0
-          </button>
-          <button className="key digit" type="button" onClick={inputDecimal}>
-            .
-          </button>
-          <button className="key operator" type="button" onClick={() => chooseOperator("+")}>
-            +
-          </button>
-          <button className="key equals" type="button" onClick={calculateResult}>
-            =
-          </button>
         </div>
       </section>
     </main>
